@@ -21,8 +21,15 @@ jobs:
         with:
           go-version: '1.25'
 
+      # Export environment variables from GitHub Secrets for build/tests
+      - name: Export environment variables
+        run: |
+          echo "PORT=${{ secrets.PORT }}" >> $GITHUB_ENV
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+          echo "OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}" >> $GITHUB_ENV
+
       - name: Build Go binary
-        run: go build -v -o llm-agent ./...
+        run: go build -v -o llm-agent main.go
 
       - name: Run tests
         run: go test ./... -v
@@ -44,22 +51,23 @@ jobs:
           script: |
             DEPLOY_DIR=/var/www/production/llm-agent
 
-            # Remove old directory
+            # Remove old diretório
             rm -rf $DEPLOY_DIR
 
-            # Clone fresh repository
-            git clone git@github.com:jm-borges/llm-agent-api.git $DEPLOY_DIR
+            # Clone repositório fresco
+            git clone https://${{ secrets.TOKEN_DEPLOY }}@github.com/jm-borges/llm-agent-api.git $DEPLOY_DIR
             cd $DEPLOY_DIR
 
-            # Build binary on server
-            go build -o llm-agent ./...
+            # Exporta variáveis de ambiente no VPS
+            echo "PORT=${{ secrets.PORT }}" > .env
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+            echo "OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}" >> .env
 
-            # Export environment variables from GitHub Secrets
-            export PORT=${{ secrets.PORT }}
-            export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            export OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
+            # Build do Go no VPS
+            go build -v -o llm-agent main.go
 
-            # Restart systemd service
-            sudo systemctl daemon-reload
-            sudo systemctl restart llm-agent
-            sudo systemctl status llm-agent --no-pager
+            # Restart do service systemd
+            sudo -n systemctl daemon-reload
+            sudo -n systemctl restart llm-agent
+            sudo -n systemctl status llm-agent --no-pager
+
