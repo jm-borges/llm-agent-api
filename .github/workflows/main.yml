@@ -1,0 +1,65 @@
+name: CI/CD Main Branch
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+
+      - name: Build Go binary
+        run: go build -v -o llm-agent ./...
+
+      - name: Run tests
+        run: go test ./... -v
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            DEPLOY_DIR=/var/www/production/llm-agent
+
+            # Remove old directory
+            rm -rf $DEPLOY_DIR
+
+            # Clone fresh repository
+            git clone git@github.com:jm-borges/llm-agent-api.git $DEPLOY_DIR
+            cd $DEPLOY_DIR
+
+            # Build binary on server
+            go build -o llm-agent ./...
+
+            # Export environment variables from GitHub Secrets
+            export PORT=${{ secrets.PORT }}
+            export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            export OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
+
+            # Restart systemd service
+            sudo systemctl daemon-reload
+            sudo systemctl restart llm-agent
+            sudo systemctl status llm-agent --no-pager
