@@ -1,4 +1,4 @@
-# LLM Voice Agent API
+# LLM Agent API
 
 A lightweight Go API that provides a simple HTTP interface to OpenAI's language models.  
 Send a POST request with a `message` to the `/query` endpoint and get a response from the OpenAI model.
